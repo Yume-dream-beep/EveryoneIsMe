@@ -59,6 +59,9 @@
   .axes .row span:last-child{text-align:right}
   .axes .track{position:relative;height:10px;background:#f2ebe2;border-radius:99px}
   .axes .dot{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%);border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
+  .cause{border-left:4px solid var(--bad);background:#fdf3f2;border-radius:0 10px 10px 0;padding:8px 12px;margin:10px 0}
+  .cause-h{font-weight:700;font-size:14px}
+  .cause-t{font-size:14px}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2b2622;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.show{opacity:1}
   .fade{animation:fade .35s ease}
@@ -200,6 +203,78 @@ const SECTORS = [
     hi:"毎週どこかでお祭り。世界一楽しい社会に。"}
 ];
 
+
+// 崩壊ストーリー(社会の寿命を決めた分野ごと)
+// cause: その分野を弱くした性格の軸と方向ごとの具体的なできごと
+const COLLAPSE = {
+  disaster:{
+    w:{p:.5,r:-.3,c:.2},
+    s1:"小さな地震や台風のたびに、ニュースで毎回「想定外でした」と言われる。",
+    cause:{
+      p:{lo:["非常食や水を備蓄している家がほとんどない。","ハザードマップを見たことがある人がいない。"]},
+      r:{hi:["警報が出ても「自分は大丈夫でしょ」と誰も避難しない。","川の近くや崖の上に、景色がいいからと家が建ち並ぶ。"]},
+      c:{lo:["避難所でみんなが好き勝手に動き、物資の配給が大混乱。","自治会の防災訓練が「各自でやっといて」で終わる。"]}
+    },
+    end:"数百年に一度の巨大地震が直撃。備えのない社会は立ち直れず、文明は幕を下ろした…"
+  },
+  food:{
+    w:{d:.45,p:.35,c:.2},
+    s1:"農家の跡継ぎがいない村が、少しずつ増えていく。",
+    cause:{
+      d:{lo:["畑仕事は大変なので、みんなやめてしまう。","収穫の手伝いを頼んでも、誰も来ない。"]},
+      p:{lo:["種をまく時期を誰も覚えていない。","「来年の分」の種や備蓄を誰も残していない。"]},
+      c:{lo:["農家同士が協力せず、壊れた用水路がそのまま。","野菜の出荷ルールがバラバラで、流通が回らない。"]}
+    },
+    end:"ある年の大凶作をきっかけに食料が尽き、社会は終わった…"
+  },
+  med:{
+    w:{d:.4,p:.3,q:.3},
+    s1:"病院の待ち時間が、毎年少しずつ長くなっていく。",
+    cause:{
+      d:{lo:["夜勤や救急当番を引き受ける人がいない。","医者を目指す人が「しんどそう」で激減する。"]},
+      p:{lo:["薬の在庫管理が適当で、必要なときに薬がない。","健康診断を予約する人がいない。"]},
+      q:{lo:["新しい治療法を研究する人がいない。","医療が100年前の水準から進歩しない。"]}
+    },
+    end:"新しい感染症が流行。治せる人がいないまま、社会は終わった…"
+  },
+  infra:{
+    w:{d:.5,p:.3,c:.2},
+    s1:"切れた街灯や道の穴が、そのまま放置され始める。",
+    cause:{
+      d:{lo:["ゴミ当番も道路の修理も、全員が「誰かがやるでしょ」。","下水道の掃除をする人がいなくなる。"]},
+      p:{lo:["点検の予定を誰も立てず、壊れてから気づく。","橋やトンネルの寿命を誰も把握していない。"]},
+      c:{lo:["工事の分担でもめて、作業が止まる。","隣の町と水道をつなぐ話し合いがまとまらない。"]}
+    },
+    end:"水道と電気が止まり、都市に住める場所がなくなった…"
+  },
+  birth:{
+    w:{s:.45,r:.3,c:.25},
+    s1:"結婚式場が、少しずつ閉店し始める。",
+    cause:{
+      s:{lo:["誰も人に会いに出かけず、出会いがない。","マッチングアプリに登録しても、誰もメッセージを送らない。"]},
+      r:{lo:["振られるのが怖くて、誰も告白しない。","「子育ては不安」と、誰も一歩を踏み出さない。"]},
+      c:{lo:["結婚しても家事の分担でもめて、長続きしない。","子育てを助け合う仕組みが作られない。"]}
+    },
+    end:"最後の世代が年をとり、人類は静かにいなくなった…"
+  }
+};
+
+// その分野が弱かった原因の軸を、影響の大きい順に返す
+function collapseCauses(k,a){
+  const C=COLLAPSE[k], res=[];
+  for(const ax in C.w){
+    const w=C.w[ax];
+    const dir = w>0 ? "lo" : "hi";            // 弱点になる向き
+    const gap = w>0 ? (100-a[ax]) : a[ax];     // どれだけその向きに寄っているか
+    if(!C.cause[ax]||!C.cause[ax][dir]) continue;
+    res.push({ax,dir,loss:Math.abs(w)*gap,val:a[ax],lines:C.cause[ax][dir]});
+  }
+  res.sort((x,y)=>y.loss-x.loss);
+  // 実際に弱点側に寄っている性格だけを原因とする(なければ一番影響の大きいもの)
+  const real=res.filter(c=>c.dir==="lo"?c.val<50:c.val>50);
+  return real.length?real:res.slice(0,1);
+}
+
 const QUIRKS = [
   {t:a=>a.c>=75, y:4, g:"bad", tx:"みんなが空気を読みすぎて、誰も「それおかしくない？」と言えない。"},
   {t:a=>a.c<=25, y:2, g:"bad", tx:"全員がマイペース。電車の時刻表が意味をなさなくなる。"},
@@ -285,7 +360,18 @@ function buildTimeline(a,sc,life){
   list.sort((x,y)=>x.y-y.y);
   if(life!==Infinity){
     const worst=SECTORS.filter(s=>s.crit).sort((x,y)=>sc[x.k]-sc[y.k])[0];
-    list.push({y:life,g:"end",tx:`「${worst.name}」が限界に。社会が回らなくなり、文明は静かに幕を下ろした…`});
+    const C=COLLAPSE[worst.k], causes=collapseCauses(worst.k,a);
+    // 同じ分野の「低い」イベントは崩壊ストーリーと重なるので外す
+    list=list.filter(e=>e.name!==worst.name);
+    const yr=f=>Math.max(1,Math.round(life*f));
+    const story=[{y:yr(.3),g:"bad",tx:C.s1}];
+    if(causes[0]) story.push({y:yr(.55),g:"bad",tx:causes[0].lines[0]});
+    if(causes[1]) story.push({y:yr(.75),g:"bad",tx:causes[1].lines[0]});
+    if(causes[0]) story.push({y:yr(.9),g:"bad",tx:causes[0].lines[1]});
+    // 年が重ならないよう少しずらす
+    let last=0; story.forEach(e=>{ if(e.y<=last) e.y=last+1; last=e.y; });
+    list=list.concat(story.filter(e=>e.y<life)).sort((x,y)=>x.y-y.y);
+    list.push({y:life,g:"end",tx:C.end});
   } else {
     list.push({y:"1000",g:"good",tx:"社会はしぶとく続いていく。たまにケンカしつつも、わりと平和。"});
   }
@@ -333,6 +419,16 @@ function finish(){
   $("bar").style.width="100%";
   const a=calcAxes(), sc=sectorScores(a), life=lifespan(sc), tn=typeName(a);
   const tl=buildTimeline(a,sc,life), comps=complements(a,sc);
+  let causeCard="";
+  if(life!==Infinity){
+    const worst=SECTORS.filter(s=>s.crit).sort((x,y)=>sc[x.k]-sc[y.k])[0];
+    const cs=collapseCauses(worst.k,a).slice(0,3);
+    causeCard=`<h2>💥 なぜ「${worst.name}」で崩壊した？</h2>
+    <div class="card">
+      <p class="sub" style="margin-top:0">「${worst.name}」のスコアは <b style="color:var(--bad)">${sc[worst.k]}</b>。社会を支える分野の中で一番低く、ここから崩れました。原因になった性格はこちら：</p>
+      ${cs.map(c=>`<div class="cause"><div class="cause-h">${AXES[c.ax].name}が${c.dir==="hi"?"高い":"低い"}（${c.val}）</div><div class="cause-t">→ ${c.lines[0]}</div></div>`).join("")}
+    </div>`;
+  }
   const color=v=>v<40?"var(--bad)":v<70?"var(--mid)":"var(--good)";
 
   const html=`
@@ -357,6 +453,7 @@ function finish(){
       ${SECTORS.map(s=>`<div class="row"><span>${s.name}${s.crit?"":""}</span><div class="track"><div class="fill" style="width:0;background:${color(sc[s.k])}" data-w="${sc[s.k]}"></div></div><span class="val">${sc[s.k]}</span></div>`).join("")}
     </div>
 
+    ${causeCard}
     <h2>📜 わたしだらけの社会・年表</h2>
     <div class="card"><div class="timeline">
       ${tl.map(e=>`<div class="ev ${e.g}"><div class="yr">${e.y===1?"1年目":e.y+"年目"}</div><div class="tx">${e.tx}</div></div>`).join("")}
