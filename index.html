@@ -80,6 +80,16 @@
   .gotbtn{margin-top:12px;border:2px solid var(--good);background:#fff;color:var(--good);border-radius:12px;padding:8px;width:100%;font-weight:700;font-family:inherit;cursor:pointer;font-size:14px}
   .gotbtn.on{background:var(--good);color:#fff}
   .counter{font-weight:900;color:var(--good)}
+  .codebox{font-family:ui-monospace,Menlo,monospace;font-size:30px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--accent2);background:#f5f9fe;border:2px dashed #b9d4f2;border-radius:14px;padding:10px;margin:8px 0}
+  .inp{width:100%;font-family:inherit;font-size:16px;padding:12px 14px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);margin:6px 0}
+  .inp:focus{outline:none;border-color:var(--accent2)}
+  .mem{display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;margin:8px 0;background:#fff}
+  .mem .nm{flex:1;font-weight:700}
+  .mem .tp{font-size:12px;color:var(--sub);font-weight:500;display:block}
+  .mem .x{border:0;background:#f2ebe2;border-radius:99px;width:30px;height:30px;font-size:16px;cursor:pointer;color:var(--sub)}
+  .role{display:grid;grid-template-columns:96px 1fr 34px;gap:8px;align-items:center;font-size:14px;margin:7px 0}
+  .role .who{font-weight:700}
+  .err{color:var(--bad);font-size:13px;min-height:18px}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2b2622;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.show{opacity:1}
   .fade{animation:fade .35s ease}
@@ -101,6 +111,8 @@
     <button class="btn" id="startBtn">シミュレーションを始める</button>
     <div style="height:10px"></div>
     <button class="btn ghost" id="zukanBtn1">📖 タイプ図鑑を見る</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" id="mixBtn1">🤝 友達と混ぜる</button>
   </section>
 
   <!-- QUIZ -->
@@ -112,6 +124,27 @@
 
   <!-- RESULT -->
   <section id="result" class="hidden"></section>
+
+  <!-- MIX -->
+  <section id="mix" class="hidden">
+    <span class="tag">友達と混ぜるモード</span>
+    <h1>🤝 この仲間だけで<br>社会を作ったら？</h1>
+    <p class="sub" style="margin-top:0">2〜5人のコードを入れると、その人たちだけで作った社会をシミュレーションします。コードは診断結果の画面に出ています。</p>
+    <div class="card">
+      <div class="k" style="font-weight:700">メンバー <span class="sub" id="mixNum"></span></div>
+      <div id="mixMembers"></div>
+      <div id="mixAdd">
+        <input class="inp" id="mixName" maxlength="10" placeholder="名前(例:ゆか)">
+        <input class="inp" id="mixCode" maxlength="6" placeholder="コード6文字(例:K3F9QA)" autocapitalize="characters" autocomplete="off" style="font-family:ui-monospace,Menlo,monospace;letter-spacing:3px">
+        <div class="err" id="mixErr"></div>
+        <button class="btn ghost" id="mixAddBtn">＋ メンバーに追加</button>
+      </div>
+    </div>
+    <button class="btn" id="mixGo">混ぜてみる！</button>
+    <div id="mixResult"></div>
+    <div style="height:14px"></div>
+    <button class="btn ghost" id="mixBack">← 戻る</button>
+  </section>
 
   <!-- ZUKAN -->
   <section id="zukan" class="hidden">
@@ -473,7 +506,7 @@ function openZukan(focusKey){
   $("zFilter").querySelectorAll(".fchip").forEach(b=>b.onclick=()=>{ zFilter=b.dataset.v; openZukan(); });
   renderZukan(focusKey);
   if($("zukan").classList.contains("hidden")){
-    zPrev=["start","result"].find(id=>!$(id).classList.contains("hidden"))||"start";
+    zPrev=["start","result","mix"].find(id=>!$(id).classList.contains("hidden"))||"start";
     show("zukan");
   }
   if(focusKey){ const el=document.querySelector(`[data-key="${focusKey}"]`); if(el) setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"center"}),80); }
@@ -507,14 +540,144 @@ function renderZukan(openKey){
   });
 }
 
+
+// ===== 友達と混ぜるモード =====
+// コード:6つの性格を、それぞれ0〜32の1文字(36進数)にしたもの
+function encodeCode(a){ return AXIS_ORDER.map(k=>Math.round(a[k]/3).toString(36)).join("").toUpperCase(); }
+function decodeCode(code){
+  code=(code||"").trim().toUpperCase();
+  if(!/^[0-9A-Z]{6}$/.test(code)) return null;
+  const a={};
+  for(let i=0;i<6;i++){ const v=parseInt(code[i],36); if(v>33) return null; a[AXIS_ORDER[i]]=Math.max(3,Math.min(97,v*3)); }
+  return a;
+}
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let mixMembers=[], mixPrev="start";
+function openMix(){
+  mixPrev=["start","result"].find(id=>!$(id).classList.contains("hidden"))||"start";
+  const saved=store.get("mixMembers",null);
+  if(saved) mixMembers=saved;
+  const my=store.get("myCode",null);
+  if(my && !mixMembers.some(m=>m.me)) mixMembers.unshift({name:"わたし",code:my,me:true});
+  if(my){ const m=mixMembers.find(m=>m.me); if(m) m.code=my; }
+  $("mixResult").innerHTML="";
+  renderMix(); show("mix");
+}
+function renderMix(){
+  store.set("mixMembers",mixMembers);
+  $("mixNum").textContent=`${mixMembers.length} / 5人`;
+  $("mixMembers").innerHTML=mixMembers.length?mixMembers.map((m,i)=>{
+    const a=decodeCode(m.code);
+    return `<div class="mem"><span class="nm">${esc(m.name)}<span class="tp">${a?typeName(a):""}</span></span><button class="x" data-i="${i}" aria-label="削除">×</button></div>`;
+  }).join(""):`<p class="sub">まだ誰もいません。まず自分も診断すると、自動で入ります。</p>`;
+  $("mixMembers").querySelectorAll(".x").forEach(b=>b.onclick=()=>{ mixMembers.splice(+b.dataset.i,1); renderMix(); });
+  $("mixAdd").style.display=mixMembers.length>=5?"none":"block";
+  $("mixGo").disabled=mixMembers.length<2;
+  $("mixGo").style.opacity=mixMembers.length<2?.45:1;
+}
+function addMember(){
+  const name=$("mixName").value.trim(), code=$("mixCode").value.trim().toUpperCase();
+  if(!name){ $("mixErr").textContent="名前を入れてください"; return; }
+  if(!decodeCode(code)){ $("mixErr").textContent="コードは英数字6文字です。もう一度確認してください"; return; }
+  if(mixMembers.some(m=>m.name===name)){ $("mixErr").textContent="同じ名前の人がいます。少し変えてください"; return; }
+  mixMembers.push({name,code}); $("mixErr").textContent=""; $("mixName").value=""; $("mixCode").value="";
+  renderMix();
+}
+
+// グループの社会:各分野は「一番得意な人」と「みんなの平均」の半分ずつで決まる
+function groupSim(members){
+  const per=members.map(m=>({...m,a:decodeCode(m.code)})).map(m=>({...m,sc:sectorScores(m.a)}));
+  const gs={}, lead={};
+  SECTORS.forEach(s=>{
+    const vals=per.map(m=>m.sc[s.k]);
+    const mx=Math.max(...vals), mean=vals.reduce((t,v)=>t+v,0)/vals.length;
+    gs[s.k]=clamp(.5*mx+.5*mean);
+    lead[s.k]=per[vals.indexOf(mx)];
+  });
+  const avg={}; AXIS_ORDER.forEach(k=>avg[k]=per.reduce((t,m)=>t+m.a[k],0)/per.length);
+  return {per,gs,lead,avg,life:lifespan(gs)};
+}
+const FRICTION={
+  c:"{hi}がみんなの意見をまとめようとするたびに、{lo}が「私は私でやる」と抜け出す。",
+  p:"{hi}が作った旅行の予定表を、{lo}が初日に全部無視する。",
+  r:"{hi}が新しい挑戦を思いつくたびに、{lo}が全力で止めに入る。",
+  s:"{hi}が開く飲み会に、{lo}は毎回「行けたら行く」と返事をして、来ない。",
+  d:"面倒な仕事を、なぜかいつも{hi}が引き受けている。{lo}はそれに気づいていない。",
+  q:"{hi}が持ち込む新しい道具を、{lo}が「前のほうが使いやすい」と押し入れにしまう。"
+};
+function runMix(){
+  const G=groupSim(mixMembers), {per,gs,lead,avg,life}=G;
+  // 年表:基本の年表+仲間ならではのイベント
+  // 「全員が〜」系の笑いどころは1人用なので外す
+  let base=buildTimeline(avg,gs,life);
+  const end=base.pop();
+  base=base.filter(e=>!e.quirk);
+  const extra=[];
+  AXIS_ORDER.forEach((k,i)=>{
+    const hi=per.reduce((x,y)=>y.a[k]>x.a[k]?y:x), lo=per.reduce((x,y)=>y.a[k]<x.a[k]?y:x);
+    if(hi.a[k]-lo.a[k]>=40) extra.push({y:2+i,g:"mid",tx:FRICTION[k].replace("{hi}",esc(hi.name)).replace("{lo}",esc(lo.name)),st:hi.a[k]-lo.a[k]});
+  });
+  SECTORS.forEach((s,i)=>{
+    const L=lead[s.k], mean=per.reduce((t,m)=>t+m.sc[s.k],0)/per.length;
+    if(L.sc[s.k]>=60 && mean<50) extra.push({y:3+i,g:"good",tx:`${esc(L.name)}のおかげで、「${s.name}」がなんとか回る。`});
+  });
+  const tl=base.concat(extra.sort((x,y)=>(y.st||0)-(x.st||0)).slice(0,6)).sort((x,y)=>(+x.y)-(+y.y)).concat([end]);
+  // もし誰かがいなかったら
+  const without=per.map(m=>{
+    const rest=mixMembers.filter(x=>x.name!==m.name);
+    const g=groupSim(rest);
+    const worst=SECTORS.filter(s=>s.crit).sort((x,y)=>g.gs[x.k]-g.gs[y.k])[0];
+    return {name:m.name,life:g.life,crit:worst.name};
+  });
+  const lv=l=>l===Infinity?100000:l;
+  const mvp=without.slice().sort((x,y)=>lv(x.life)-lv(y.life))[0];
+  const color=v=>v<40?"var(--bad)":v<70?"var(--mid)":"var(--good)";
+  const solo=per.map(m=>({name:m.name,life:lifespan(m.sc)}));
+
+  $("mixResult").innerHTML=`<div class="fade">
+    <h2>🌍 この${per.length}人だけの社会</h2>
+    <div class="card">
+      <p class="sub" style="text-align:center;margin:0">社会が続く期間</p>
+      <div class="lifespan"><div class="num ${life===Infinity?"forever":""}">${fmtLife(life)}</div></div>
+      <p class="sub" style="text-align:center;margin-bottom:0">ひとりずつ全人類だった場合：${solo.map(x=>`${esc(x.name)} ${fmtLife(x.life)}`).join(" / ")}</p>
+    </div>
+    ${lv(mvp.life)<lv(life)?`<div class="card" style="text-align:center;border-color:var(--accent)">
+      <div class="sub">この社会のMVP</div>
+      <div class="typename">🏆 ${esc(mvp.name)}</div>
+      <p class="sub" style="margin-bottom:0">${esc(mvp.name)}がいないと、社会は${fmtLife(mvp.life)}で終わってしまう</p>
+    </div>`:""}
+    <h2>🧑‍🔧 分野ごとの担当</h2>
+    <div class="card">
+      ${SECTORS.map(s=>`<div class="role"><span>${s.name}</span><span class="who">${esc(lead[s.k].name)}</span><span class="val" style="color:${color(gs[s.k])};font-weight:700;text-align:right">${gs[s.k]}</span></div>`).join("")}
+      <p class="sub" style="margin-bottom:0;font-size:12px">数字はこの社会のスコア。一番得意な人が担当します。</p>
+    </div>
+    <h2>📜 この仲間の社会・年表</h2>
+    <div class="card"><div class="timeline">
+      ${tl.map(e=>`<div class="ev ${e.g}"><div class="yr">${e.y}年目</div><div class="tx">${e.tx}</div></div>`).join("")}
+    </div></div>
+    <h2>😱 もし誰かがいなかったら…</h2>
+    <div class="card">
+      ${without.map(w=>`<p style="margin:6px 0"><b>${esc(w.name)}</b>がいなかったら → <b style="color:${lv(w.life)<lv(life)?"var(--bad)":"var(--good)"}">${fmtLife(w.life)}</b>${w.life===Infinity?"":`<span class="sub">(${w.crit}で崩壊)</span>`}${lv(w.life)>lv(life)?`<span class="sub"> …いないほうが長続き!?</span>`:""}</p>`).join("")}
+    </div>
+    <button class="btn ghost" id="mixCopy">結果をテキストでコピー</button>
+  </div>`;
+  const txt=`【全人類わたし化シミュレーター・友達と混ぜるモード】\n${per.map(m=>m.name).join("・")}だけの社会は ${fmtLife(life)} 続く！\n${lv(mvp.life)<lv(life)?"MVPは "+mvp.name+"\n":""}https://yume-dream-beep.github.io/EveryoneIsMe/`;
+  $("mixCopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(txt); toast("コピーしました！"); }catch(e){ toast("コピーできませんでした"); } };
+  setTimeout(()=>$("mixResult").scrollIntoView({behavior:"smooth"}),60);
+}
+
 let idx=0, answers=[];
 const $=id=>document.getElementById(id);
 
 $("zukanBtn1").onclick=()=>openZukan(store.get("me",null));
 $("zBack").onclick=()=>show(zPrev);
+$("mixBtn1").onclick=()=>openMix();
+$("mixBack").onclick=()=>show(mixPrev);
+$("mixAddBtn").onclick=addMember;
+$("mixGo").onclick=()=>{ if(mixMembers.length>=2) runMix(); };
 $("startBtn").onclick=()=>{ idx=0; answers=[]; show("quiz"); renderQ(); };
 
-function show(id){ ["start","quiz","result","zukan"].forEach(s=>$(s).classList.toggle("hidden",s!==id)); window.scrollTo(0,0); }
+function show(id){ ["start","quiz","result","zukan","mix"].forEach(s=>$(s).classList.toggle("hidden",s!==id)); window.scrollTo(0,0); }
 
 function renderQ(){
   const Q=QUESTIONS[idx];
@@ -712,6 +875,16 @@ function finish(){
       <p style="margin:0">あなたの「苦手」は、誰かの「得意」。<br>社会はいろんな人がいるから回っている。</p>
     </div>
 
+    <h2>🤝 友達と混ぜる</h2>
+    <div class="card" style="text-align:center">
+      <p style="margin-top:0">あなたのコード</p>
+      <div class="codebox">${encodeCode(a)}</div>
+      <p class="sub">友達にこのコードを送って、「友達と混ぜる」で入れてもらおう。友達のコードを入れれば、あなたとその友達だけの社会ができます。</p>
+      <button class="btn ghost" id="codeCopy">コードと招待文をコピー</button>
+      <div style="height:10px"></div>
+      <button class="btn" id="mixBtn2">友達と混ぜてみる</button>
+    </div>
+
     <h2>📸 シェア用画像</h2>
     <div class="card" style="text-align:center">
       <div id="cardWrap"><p class="sub">画像をつくっています…</p></div>
@@ -740,6 +913,13 @@ function finish(){
   store.set("me",myKey);
   const got=store.get("got",[]); if(!got.includes(myKey)){ got.push(myKey); store.set("got",got); }
   $("zukanBtn2").onclick=()=>openZukan(myKey);
+  const myCode=encodeCode(a);
+  store.set("myCode",myCode);
+  $("codeCopy").onclick=async()=>{
+    const t=`「全人類わたし化シミュレーター」で、私と混ぜて社会を作ってみて！\n私のコード：${myCode}\nhttps://yume-dream-beep.github.io/EveryoneIsMe/\n(診断したあと「友達と混ぜる」でコードを入れてね)`;
+    try{ await navigator.clipboard.writeText(t); toast("コピーしました！"); }catch(e){ toast("コピーできませんでした"); }
+  };
+  $("mixBtn2").onclick=()=>openMix();
 
   // シェア用画像
   let causeLine="";
@@ -877,6 +1057,7 @@ async function makeCard({tn,life,tl,causeLine,comp}){
 
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
 if(location.hash==="#zukan") openZukan(store.get("me",null));
+if(location.hash==="#mix") openMix();
 </script>
 </body>
 </html>
