@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全人類わたし化シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fbf6ee; --card:#ffffff; --ink:#2b2622; --sub:#7a6f66; --line:#eadfd2;
+    --accent:#e2683c; --accent2:#3c8ce2; --good:#2f9e6b; --bad:#d6453d; --mid:#e0a526;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Maru Gothic",system-ui,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-size:26px;font-weight:900;line-height:1.35;margin:8px 0 12px}
+  h2{font-size:19px;font-weight:900;margin:28px 0 12px}
+  .tag{display:inline-block;font-size:12px;font-weight:700;color:var(--accent);background:#fde9df;border-radius:99px;padding:2px 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 2px 0 var(--line)}
+  .big-emoji{font-size:64px;text-align:center;margin:10px 0 0}
+  p{margin:8px 0}
+  .sub{color:var(--sub);font-size:14px}
+  button{font-family:inherit}
+  .btn{display:block;width:100%;border:0;border-radius:14px;padding:15px;font-size:17px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;box-shadow:0 4px 0 #b84c25;transition:transform .08s}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #b84c25}
+  .btn.ghost{background:#fff;color:var(--ink);border:2px solid var(--line);box-shadow:0 3px 0 var(--line)}
+  .opt{display:block;width:100%;text-align:left;background:#fff;border:2px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0;font-size:16px;cursor:pointer;color:var(--ink);transition:border-color .15s, background .15s}
+  .opt:hover{border-color:var(--accent);background:#fff7f2}
+  .progress{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0 18px}
+  .progress > div{height:100%;background:var(--accent);transition:width .3s}
+  .qnum{font-size:13px;color:var(--sub);font-weight:700}
+  .qtext{font-size:20px;font-weight:700;line-height:1.5;margin:6px 0 10px}
+  .hidden{display:none}
+  .typename{font-size:22px;font-weight:900;text-align:center;line-height:1.45;margin:4px 0}
+  .lifespan{text-align:center;margin:6px 0}
+  .lifespan .num{font-size:44px;font-weight:900;color:var(--accent);line-height:1.1}
+  .lifespan .num.forever{color:var(--good);font-size:34px}
+  .bars .row{display:grid;grid-template-columns:92px 1fr 34px;align-items:center;gap:8px;font-size:14px;margin:7px 0}
+  .bars .track{height:12px;background:#f2ebe2;border-radius:99px;overflow:hidden}
+  .bars .fill{height:100%;border-radius:99px;transition:width .8s ease}
+  .bars .val{text-align:right;font-weight:700;font-size:13px;color:var(--sub)}
+  .timeline{position:relative;padding-left:22px}
+  .timeline:before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .ev{position:relative;margin:0 0 14px}
+  .ev:before{content:"";position:absolute;left:-20px;top:7px;width:12px;height:12px;border-radius:50%;background:var(--mid);border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+  .ev.good:before{background:var(--good)} .ev.bad:before{background:var(--bad)} .ev.end:before{background:#2b2622}
+  .ev .yr{font-size:12px;font-weight:700;color:var(--sub)}
+  .ev .tx{font-size:15px}
+  .ev.end .tx{font-weight:700}
+  .comp{border:2px dashed #b9d4f2;background:#f5f9fe}
+  .comp .ctitle{font-weight:900;font-size:17px;color:var(--accent2);line-height:1.5}
+  .comp .change{font-size:14px;margin-top:8px}
+  .comp .change b{color:var(--good)}
+  .arrow{font-weight:900;color:var(--good)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .chip{font-size:12px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+  .axes .row{display:grid;grid-template-columns:70px 1fr 70px;align-items:center;gap:8px;font-size:12px;margin:8px 0;color:var(--sub)}
+  .axes .row span:last-child{text-align:right}
+  .axes .track{position:relative;height:10px;background:#f2ebe2;border-radius:99px}
+  .axes .dot{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%);border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2b2622;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .fade{animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- START -->
+  <section id="start" class="fade">
+    <span class="tag">性格診断 × 社会シミュレーション</span>
+    <h1>もし、この世の全人類が<br>「わたし」だったら？</h1>
+    <div class="big-emoji">🌍🙋‍♀️🙋‍♀️🙋‍♀️</div>
+    <div class="card">
+      <p>13個の質問に答えると、あなたの性格をもとに<b>「全人類があなた」の社会</b>をシミュレーションします。</p>
+      <p class="sub">社会は何年続く？ どんな事件が起きる？ そして、どんな人がいれば社会は回っていた？</p>
+    </div>
+    <button class="btn" id="startBtn">シミュレーションを始める</button>
+  </section>
+
+  <!-- QUIZ -->
+  <section id="quiz" class="hidden">
+    <div class="qnum" id="qnum"></div>
+    <div class="progress"><div id="bar"></div></div>
+    <div id="qbox"></div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" class="hidden"></section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const AXES = {
+  c:{name:"協調性", hi:"和を大事にする", lo:"我が道を行く", L:"マイペース", R:"協調"},
+  p:{name:"計画性", hi:"計画魔", lo:"その場のノリ", L:"ノリ", R:"計画"},
+  r:{name:"冒険心", hi:"冒険家", lo:"石橋を叩く", L:"慎重", R:"冒険"},
+  s:{name:"社交性", hi:"人が好き", lo:"ひとり時間大好き", L:"ひとり", R:"社交"},
+  d:{name:"奉仕心", hi:"縁の下の力持ち", lo:"自分ファースト", L:"自分優先", R:"人のため"},
+  q:{name:"好奇心", hi:"新しいもの好き", lo:"いつもの安心派", L:"安定", R:"新しいもの"}
+};
+// 必要な方向の人物像(補完タイプの説明用)
+const HELPER = {
+  c:{hi:"みんなの意見をまとめて、輪をつくってくれる", lo:"空気を読まずに「それ、おかしくない？」と言ってくれる"},
+  p:{hi:"何年も先を見て、コツコツ準備してくれる", lo:"予定外のことにも「まあ何とかなる」と即対応してくれる"},
+  r:{hi:"失敗を恐れず、新しいことに飛び込んでくれる", lo:"危ないことに「ちょっと待って」とブレーキをかけてくれる"},
+  s:{hi:"人と人をつなぎ、場を盛り上げてくれる", lo:"一人で黙々と、集中して作業してくれる"},
+  d:{hi:"誰もやりたがらない仕事を、黙って引き受けてくれる", lo:"自分の幸せを大事にして、無理しすぎない手本を見せてくれる"},
+  q:{hi:"新しいアイデアや発明をどんどん持ち込んでくれる", lo:"昔からのやり方や技術を大切に守り続けてくれる"}
+};
+
+const QUESTIONS = [
+  {q:"町内会のゴミ当番が回ってきた。でも今日は大雨。", o:[
+    ["雨でもちゃんとやる",{d:15,p:5}],
+    ["隣の人に代わってもらえないか聞いてみる",{s:10,d:-5}],
+    ["誰も見てないし、来週まとめてやる",{d:-15,p:-10}]]},
+  {q:"休みの日の予定は？", o:[
+    ["1週間前から決めてある",{p:15}],
+    ["友達に誘われたら行く",{s:10,p:-5}],
+    ["起きてから考える",{p:-15}]]},
+  {q:"職場で、誰もやりたがらない仕事が出てきた。", o:[
+    ["「じゃあ私が」と手を挙げる",{d:15,c:5}],
+    ["くじ引きで公平に決めようと提案する",{c:10,p:5}],
+    ["目を合わせないようにする",{d:-15}]]},
+  {q:"知らない国に1か月住めるチャンス！ ただし準備期間は3日。", o:[
+    ["即決で行く",{r:15,q:10}],
+    ["気になるけど、まず下調べしてから",{r:-5,p:10}],
+    ["今の生活が好きなので断る",{r:-15,q:-10}]]},
+  {q:"飲み会に誘われた。知り合いは1人だけ。", o:[
+    ["新しい友達ができるかも。行く！",{s:15}],
+    ["行くけど、その1人と端っこで話す",{s:-5,c:5}],
+    ["家で好きなことをしたいので断る",{s:-15}]]},
+  {q:"会議で、自分と違う意見が多数派だった。", o:[
+    ["みんなに合わせる",{c:15}],
+    ["納得いくまで反論する",{c:-10,s:5}],
+    ["黙ってるけど、心の中では反対",{c:-5,s:-10}]]},
+  {q:"新しいアプリやサービスが出たら？", o:[
+    ["すぐ試す",{q:15,r:5}],
+    ["評判を見てから",{r:-5,p:5}],
+    ["今使ってるもので十分",{q:-15}]]},
+  {q:"臨時収入で100万円が入った！", o:[
+    ["投資や新しい挑戦に使う",{r:15}],
+    ["半分使って、半分とっておく",{p:5}],
+    ["全部貯金する",{r:-15,p:5}]]},
+  {q:"道で困っていそうな観光客を見かけた。", o:[
+    ["自分から声をかける",{d:10,s:10}],
+    ["目が合ったら助ける",{d:5}],
+    ["誰かが助けるだろう",{d:-10,s:-5}]]},
+  {q:"チームで作業するなら？", o:[
+    ["みんなで相談しながら進めたい",{c:15,s:5}],
+    ["役割だけ決めて、あとは各自で",{p:5}],
+    ["正直、一人でやったほうが早い",{c:-15,s:-5}]]},
+  {q:"子どもの頃の夏休みの宿題は？", o:[
+    ["計画通り毎日少しずつ",{p:15}],
+    ["最初の数日で一気に終わらせた",{p:5,r:5}],
+    ["最終日に泣きながらやった",{p:-15}]]},
+  {q:"「いつものやり方を変えよう」と提案されたら？", o:[
+    ["ワクワクする。やってみよう！",{q:15,r:5}],
+    ["メリット次第かな",{p:5}],
+    ["今のままで回ってるなら変えたくない",{q:-15,r:-5}]]},
+  {q:"夜中に「明日、急にシフト入れる？」と頼まれた。", o:[
+    ["困ってるなら入る",{d:15}],
+    ["予定次第で考える",{p:5}],
+    ["断る。自分の時間が大事",{d:-15}]]}
+];
+
+// 社会の分野
+const SECTORS = [
+  {k:"food", name:"食料", crit:true, f:a=>.45*a.d+.35*a.p+.2*a.c,
+    lo:"誰も早起きして畑に行かない。スーパーの棚が空っぽに。",
+    hi:"全員がまじめに畑仕事。食料自給率200%を達成。"},
+  {k:"med", name:"医療", crit:true, f:a=>.4*a.d+.3*a.p+.3*a.q,
+    lo:"夜勤をやりたい医者がいない。病院が平日の昼だけ営業に。",
+    hi:"医療が超充実。平均寿命が100歳を突破。"},
+  {k:"infra", name:"インフラ・ゴミ", crit:true, f:a=>.5*a.d+.3*a.p+.2*a.c,
+    lo:"ゴミ当番を全員がスルー。街がゴミの山に。",
+    hi:"街はピカピカ。道にゴミひとつ落ちていない。"},
+  {k:"birth", name:"人口・恋愛", crit:true, f:a=>.45*a.s+.3*a.r+.25*a.c,
+    lo:"誰も告白しない。出生数が激減する。",
+    hi:"恋愛ブームでベビーラッシュ到来。"},
+  {k:"disaster", name:"防災", crit:true, f:a=>.5*a.p+.3*(100-a.r)+.2*a.c,
+    lo:"避難訓練に誰も来ない。台風で大混乱に。",
+    hi:"防災が完璧。大地震でも被害はほぼゼロ。"},
+  {k:"eco", name:"経済", crit:false, f:a=>.35*a.s+.35*a.r+.3*a.q,
+    lo:"誰も営業も起業もしない。お店が減り、経済がゆっくり止まる。",
+    hi:"あちこちで起業ブーム。商店街が大にぎわい。"},
+  {k:"tech", name:"技術革新", crit:false, f:a=>.45*a.q+.35*a.r+.2*(100-a.c),
+    lo:"新しいことをやる人がいない。スマホが10年前のまま。",
+    hi:"発明ラッシュ。空飛ぶ車が実用化。"},
+  {k:"safe", name:"治安", crit:false, f:a=>.4*a.c+.3*a.d+.3*(100-a.r),
+    lo:"全員が「自分くらいいいか」と思い、ルール破りが日常に。",
+    hi:"犯罪がほぼゼロに。家に鍵をかける人がいなくなる。"},
+  {k:"pol", name:"政治・合意", crit:false, f:a=>.4*a.c+.35*a.s+.25*a.p,
+    lo:null, hi:"話し合いがスムーズで、法律が秒で決まる。"},
+  {k:"cul", name:"文化・娯楽", crit:false, f:a=>.4*a.q+.35*a.s+.25*(100-a.p),
+    lo:"新しい音楽も映画も生まれず、毎日が少し退屈に。",
+    hi:"毎週どこかでお祭り。世界一楽しい社会に。"}
+];
+
+const QUIRKS = [
+  {t:a=>a.c>=75, y:4, g:"bad", tx:"みんなが空気を読みすぎて、誰も「それおかしくない？」と言えない。"},
+  {t:a=>a.c<=25, y:2, g:"bad", tx:"全員がマイペース。電車の時刻表が意味をなさなくなる。"},
+  {t:a=>a.s<=25, y:3, g:"mid", tx:"街から居酒屋が消え、静かすぎて鳥の声がよく聞こえる。"},
+  {t:a=>a.s>=75, y:2, g:"mid", tx:"毎晩どこかで飲み会。翌朝の出勤率が下がる。"},
+  {t:a=>a.p>=75, y:6, g:"mid", tx:"全員の予定が5年先まで埋まり、急なトラブルに誰も対応できない。"},
+  {t:a=>a.p<=25, y:1, g:"mid", tx:"全国の会議が「とりあえず集まってから考えよう」で始まる。"},
+  {t:a=>a.r>=75, y:3, g:"bad", tx:"全員が一発逆転を狙い、株価が毎日乱高下。"},
+  {t:a=>a.r<=25, y:5, g:"mid", tx:"誰もリスクを取らず、新しいお店が1軒もできない。"},
+  {t:a=>a.d>=75, y:7, g:"bad", tx:"全員が人のために働きすぎて、休み方を忘れる。"},
+  {t:a=>a.d<=25, y:1, g:"bad", tx:"「誰かがやるでしょ」が国民の合言葉になる。"},
+  {t:a=>a.q>=75, y:8, g:"bad", tx:"全員が新しいことに夢中。古い橋の直し方を誰も覚えていない。"},
+  {t:a=>a.q<=25, y:6, g:"mid", tx:"流行語大賞が10年連続で同じ言葉になる。"}
+];
+
+let idx=0, answers=[];
+const $=id=>document.getElementById(id);
+
+$("startBtn").onclick=()=>{ idx=0; answers=[]; show("quiz"); renderQ(); };
+
+function show(id){ ["start","quiz","result"].forEach(s=>$(s).classList.toggle("hidden",s!==id)); window.scrollTo(0,0); }
+
+function renderQ(){
+  const Q=QUESTIONS[idx];
+  $("qnum").textContent=`Q${idx+1} / ${QUESTIONS.length}`;
+  $("bar").style.width=(idx/QUESTIONS.length*100)+"%";
+  const box=$("qbox");
+  box.innerHTML=`<div class="card fade"><div class="qtext">${Q.q}</div>${Q.o.map((o,i)=>`<button class="opt" data-i="${i}">${o[0]}</button>`).join("")}</div>`
+    + (idx>0?`<button class="btn ghost" id="backBtn" style="margin-top:6px">← ひとつ戻る</button>`:"");
+  box.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+    answers[idx]=+b.dataset.i; idx++;
+    if(idx<QUESTIONS.length) renderQ(); else finish();
+  });
+  if(idx>0) $("backBtn").onclick=()=>{ idx--; renderQ(); };
+}
+
+function calcAxes(){
+  const a={c:50,p:50,r:50,s:50,d:50,q:50};
+  answers.forEach((ai,qi)=>{ const eff=QUESTIONS[qi].o[ai][1]; for(const k in eff) a[k]+=eff[k]; });
+  for(const k in a) a[k]=Math.max(3,Math.min(97,a[k]));
+  return a;
+}
+const clamp=v=>Math.max(0,Math.min(100,Math.round(v)));
+function sectorScores(a){ const o={}; SECTORS.forEach(s=>o[s.k]=clamp(s.f(a))); return o; }
+function lifespan(sc){
+  const m=Math.min(...SECTORS.filter(s=>s.crit).map(s=>sc[s.k]));
+  if(m>=64) return Infinity;
+  return Math.max(3,Math.round(3*Math.pow(1.095,m)));
+}
+const fmtLife=l=>l===Infinity?"1000年以上":`${l}年`;
+
+function typeName(a){
+  const ks=Object.keys(a).sort((x,y)=>Math.abs(a[y]-50)-Math.abs(a[x]-50));
+  const lab=k=>a[k]>=50?AXES[k].hi:AXES[k].lo;
+  if(Math.abs(a[ks[0]]-50)<10) return "「バランス型」の平均的ニンゲン";
+  return `「${lab(ks[0])}」×「${lab(ks[1])}」タイプ`;
+}
+
+function buildTimeline(a,sc,life){
+  const ev=[];
+  SECTORS.forEach(s=>{
+    const v=sc[s.k];
+    if(v<40){
+      let tx=s.lo;
+      if(s.k==="pol") tx = a.s<45 ? "会議で誰も発言しない。法律が1本も決まらない。" : "会議で誰も譲らない。国会が10年間ずっと延長戦。";
+      ev.push({y:2+Math.round(v/2.5),g:"bad",tx,name:s.name});
+    } else if(v>=70){
+      ev.push({y:1+Math.round((100-v)/5),g:"good",tx:s.hi,name:s.name});
+    }
+  });
+  QUIRKS.forEach(q=>{ if(q.t(a)) ev.push({y:q.y,g:q.g,tx:q.tx}); });
+  let list=ev.filter(e=>life===Infinity||e.y<life).sort((x,y)=>x.y-y.y);
+  if(!list.some(e=>e.g==="bad")){
+    const w=SECTORS.filter(x=>x.lo).sort((x,y)=>sc[x.k]-sc[y.k])[0];
+    const yy=Math.min(life===Infinity?60:life-1, 20+sc[w.k]);
+    list.push({y:yy,g:"bad",tx:"少しずつ問題が表に出てくる。"+w.lo});
+  }
+  if(!list.some(e=>e.g==="good")){
+    const b=SECTORS.slice().sort((x,y)=>sc[y.k]-sc[x.k])[0];
+    if(sc[b.k]>=50) list.push({y:Math.max(1,Math.round((100-sc[b.k])/4)),g:"good",tx:"「"+b.name+"」がこの社会の強み。"+b.hi.replace(/。$/,"")+"…とまではいかないが、かなりいい線。"});
+  }
+  if(list.length<3) list.push({y:10,g:"mid",tx:"特に大きな事件もなく、まずまず平和な日々が続く。"});
+  list.sort((x,y)=>x.y-y.y);
+  if(life!==Infinity){
+    const worst=SECTORS.filter(s=>s.crit).sort((x,y)=>sc[x.k]-sc[y.k])[0];
+    list.push({y:life,g:"end",tx:`「${worst.name}」が限界に。社会が回らなくなり、文明は静かに幕を下ろした…`});
+  } else {
+    list.push({y:"1000",g:"good",tx:"社会はしぶとく続いていく。たまにケンカしつつも、わりと平和。"});
+  }
+  return list;
+}
+
+function complements(a,sc){
+  // 「軸2つを極端にした人」を全パターン試し、社会の3割に混ぜたら一番よくなるタイプを選ぶ
+  const keys=Object.keys(a), cands=[];
+  const critMin=x=>Math.min(...SECTORS.filter(s=>s.crit).map(s=>x[s.k]));
+  const total=x=>SECTORS.reduce((t,s)=>t+x[s.k],0);
+  for(let i=0;i<keys.length;i++)for(let j=0;j<keys.length;j++){ if(i===j) continue;
+    for(const di of ["hi","lo"]) for(const dj of ["hi","lo"]){
+      const k1=keys[i],k2=keys[j];
+      const v1=di==="hi"?90:10, v2=dj==="hi"?90:10;
+      // 自分と同じ方向の人は「違うタイプ」ではないので除外
+      if(Math.abs(a[k1]-v1)<30||Math.abs(a[k2]-v2)<30) continue;
+      const prof={...a,[k1]:v1,[k2]:v2}; // 他の軸はあなたと同じ
+      const mix={}; for(const k in a) mix[k]=a[k]*.7+prof[k]*.3;
+      const msc=sectorScores(mix), life=lifespan(msc);
+      const score=(life===Infinity?5000:life)*10 + critMin(msc)*3 + (total(msc)-total(sc));
+      cands.push({k1,di,k2,dj,msc,life,score});
+    }
+  }
+  cands.sort((x,y)=>y.score-x.score);
+  const out=[], usedPrimary=new Set(), usedPair=new Set();
+  for(const c of cands){
+    if(out.length>=3) break;
+    const pair=[c.k1+c.di,c.k2+c.dj].sort().join("|");
+    if(usedPair.has(pair)||usedPrimary.has(c.k1+c.di)) continue;
+    const ups=SECTORS.map(x=>({name:x.name,from:sc[x.k],to:c.msc[x.k]})).filter(x=>x.to-x.from>=4).sort((x,y)=>(y.to-y.from)-(x.to-x.from)).slice(0,3);
+    if(!ups.length) continue;
+    usedPair.add(pair); usedPrimary.add(c.k1+c.di);
+    out.push({
+      name:`「${AXES[c.k1][c.di]}」×「${AXES[c.k2][c.dj]}」タイプ`,
+      desc:HELPER[c.k1][c.di]+"。そして、"+HELPER[c.k2][c.dj]+"人。",
+      life:c.life, ups
+    });
+  }
+  return out;
+}
+
+let shareText="";
+function finish(){
+  $("bar").style.width="100%";
+  const a=calcAxes(), sc=sectorScores(a), life=lifespan(sc), tn=typeName(a);
+  const tl=buildTimeline(a,sc,life), comps=complements(a,sc);
+  const color=v=>v<40?"var(--bad)":v<70?"var(--mid)":"var(--good)";
+
+  const html=`
+  <div class="fade">
+    <span class="tag">シミュレーション結果</span>
+    <div class="card">
+      <p class="sub" style="text-align:center;margin:0">あなたは…</p>
+      <div class="typename">${tn}</div>
+      <div class="axes" style="margin-top:12px">
+        ${Object.keys(AXES).map(k=>`<div class="row"><span>${AXES[k].L}</span><div class="track"><div class="dot" style="left:${a[k]}%"></div></div><span>${AXES[k].R}</span></div>`).join("")}
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="sub" style="text-align:center;margin:0">全人類があなただった場合、社会が続く期間</p>
+      <div class="lifespan"><div class="num ${life===Infinity?"forever":""}">${fmtLife(life)}</div></div>
+      <p class="sub" style="text-align:center">${life===Infinity?"意外と回る！ ただし、ところどころ問題も…":life<30?"かなり早めに限界がきます…":life<200?"しばらくは回るけど、どこかで無理が出ます":"長持ちするけど、永遠ではありません"}</p>
+    </div>
+
+    <h2>📊 社会の各分野</h2>
+    <div class="card bars">
+      ${SECTORS.map(s=>`<div class="row"><span>${s.name}${s.crit?"":""}</span><div class="track"><div class="fill" style="width:0;background:${color(sc[s.k])}" data-w="${sc[s.k]}"></div></div><span class="val">${sc[s.k]}</span></div>`).join("")}
+    </div>
+
+    <h2>📜 わたしだらけの社会・年表</h2>
+    <div class="card"><div class="timeline">
+      ${tl.map(e=>`<div class="ev ${e.g}"><div class="yr">${e.y===1?"1年目":e.y+"年目"}</div><div class="tx">${e.tx}</div></div>`).join("")}
+    </div></div>
+
+    <h2>🤝 あなたとは違う、こんなタイプの人がいたら…</h2>
+    <p class="sub">社会の3割がこのタイプだったら、社会は回っていたかも…</p>
+    ${comps.map(c=>`
+      <div class="card comp">
+        <div class="ctitle">${c.name}</div>
+        <p style="font-size:15px">${c.desc}</p>
+        <div class="change">社会が続く期間：${fmtLife(life)} <span class="arrow">→</span> <b>${fmtLife(c.life)}</b></div>
+        <div class="chips">${c.ups.map(u=>`<span class="chip">${u.name} ${u.from}→<b style="color:var(--good)">${u.to}</b></span>`).join("")}</div>
+      </div>`).join("")}
+
+    <div class="card" style="text-align:center">
+      <p style="margin:0">あなたの「苦手」は、誰かの「得意」。<br>社会はいろんな人がいるから回っている。</p>
+    </div>
+
+    <button class="btn" id="copyBtn">結果をコピーしてシェア</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" id="retryBtn">もう一度やる</button>
+  </div>`;
+  $("result").innerHTML=html;
+  show("result");
+  requestAnimationFrame(()=>setTimeout(()=>document.querySelectorAll(".fill").forEach(f=>f.style.width=f.dataset.w+"%"),50));
+
+  const bad=tl.find(e=>e.g==="bad"||e.g==="end");
+  shareText=`【全人類わたし化シミュレーター】\n私は${tn}\n全人類が私だったら、社会は${fmtLife(life)}続く！\n${bad?"起きた事件:"+bad.tx+"\n":""}${comps[0]?"足りなかったのは… "+comps[0].name:""}`;
+  $("copyBtn").onclick=async()=>{
+    try{ await navigator.clipboard.writeText(shareText); toast("コピーしました！"); }
+    catch(e){ toast("コピーできませんでした"); }
+  };
+  $("retryBtn").onclick=()=>show("start");
+}
+
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
+</script>
+</body>
+</html>
