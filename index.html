@@ -62,6 +62,24 @@
   .cause{border-left:4px solid var(--bad);background:#fdf3f2;border-radius:0 10px 10px 0;padding:8px 12px;margin:10px 0}
   .cause-h{font-weight:700;font-size:14px}
   .cause-t{font-size:14px}
+  .chipbar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+  .fchip{border:2px solid var(--line);background:#fff;border-radius:99px;padding:4px 12px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);font-family:inherit}
+  .fchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tcard{background:#fff;border:2px solid var(--line);border-radius:16px;margin:10px 0;overflow:hidden}
+  .tcard.mine{border-color:var(--accent);box-shadow:0 0 0 3px #fde9df}
+  .thead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+  .tno{font-size:12px;font-weight:700;color:var(--sub);min-width:28px}
+  .tname{flex:1;font-weight:700;font-size:15px;line-height:1.4}
+  .tlife{font-size:13px;font-weight:900;white-space:nowrap}
+  .tbody{padding:0 14px 14px;font-size:14px;border-top:1px dashed var(--line)}
+  .tbody .k{font-size:12px;color:var(--sub);font-weight:700;margin-top:10px}
+  .mark{font-size:11px;font-weight:700;border-radius:99px;padding:1px 8px;margin-left:4px;vertical-align:2px}
+  .mark.me{background:var(--accent);color:#fff}
+  .mark.got{background:#e3f4ec;color:var(--good)}
+  .tcard.locked .tname{color:#b5aaa0}
+  .gotbtn{margin-top:12px;border:2px solid var(--good);background:#fff;color:var(--good);border-radius:12px;padding:8px;width:100%;font-weight:700;font-family:inherit;cursor:pointer;font-size:14px}
+  .gotbtn.on{background:var(--good);color:#fff}
+  .counter{font-weight:900;color:var(--good)}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2b2622;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.show{opacity:1}
   .fade{animation:fade .35s ease}
@@ -81,6 +99,8 @@
       <p class="sub">社会は何年続く？ どんな事件が起きる？ そして、どんな人がいれば社会は回っていた？</p>
     </div>
     <button class="btn" id="startBtn">シミュレーションを始める</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" id="zukanBtn1">📖 タイプ図鑑を見る</button>
   </section>
 
   <!-- QUIZ -->
@@ -92,6 +112,21 @@
 
   <!-- RESULT -->
   <section id="result" class="hidden"></section>
+
+  <!-- ZUKAN -->
+  <section id="zukan" class="hidden">
+    <span class="tag">全61タイプ</span>
+    <h1>📖 タイプ図鑑</h1>
+    <p class="sub" style="margin-top:0">それぞれのタイプが全人類になったら、社会はどうなる？ タップで詳しく見られます。<br><span style="font-size:12px">※年数はそのタイプの代表的な人で計算した目安です。あなたの結果とは少し違うことがあります。</span></p>
+    <div class="card" style="padding:14px 16px">
+      集めたタイプ：<span class="counter" id="zCount"></span>
+      <div class="sub" style="font-size:12px">自分の結果は自動で登録。友達のタイプは「見つけた！」で登録できます(この端末だけに保存)。</div>
+    </div>
+    <div class="chipbar" id="zFilter"></div>
+    <div id="zList"></div>
+    <div style="height:14px"></div>
+    <button class="btn ghost" id="zBack">← 戻る</button>
+  </section>
 
 </div>
 <div class="toast" id="toast"></div>
@@ -385,12 +420,101 @@ const SECTOR_ALT = {
 };
 function seedOf(a){ return Object.values(a).reduce((t,v,i)=>t+Math.round(v)*(i+3),0); }
 
+
+// ===== タイプ図鑑 =====
+const store={
+  get(k,d){ try{ const v=localStorage.getItem("eim_"+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("eim_"+k,JSON.stringify(v)); }catch(e){} }
+};
+function typeKey(a){
+  const ks=Object.keys(a).sort((x,y)=>Math.abs(a[y]-50)-Math.abs(a[x]-50));
+  if(Math.abs(a[ks[0]]-50)<10) return "balanced";
+  const p=[[ks[0],a[ks[0]]>=50?"hi":"lo"],[ks[1],a[ks[1]]>=50?"hi":"lo"]]
+    .sort((x,y)=>AXIS_ORDER.indexOf(x[0])-AXIS_ORDER.indexOf(y[0]));
+  return p.map(x=>x.join("-")).join("|");
+}
+let TYPES=null;
+function buildTypes(){
+  if(TYPES) return TYPES;
+  TYPES=[]; let n=0;
+  for(let i=0;i<AXIS_ORDER.length;i++) for(let j=i+1;j<AXIS_ORDER.length;j++)
+  for(const di of ["hi","lo"]) for(const dj of ["hi","lo"]){
+    const k1=AXIS_ORDER[i], k2=AXIS_ORDER[j];
+    const a={c:50,p:50,r:50,s:50,d:50,q:50}; a[k1]=di==="hi"?85:15; a[k2]=dj==="hi"?85:15;
+    TYPES.push(makeTypeInfo(++n,`${k1}-${di}|${k2}-${dj}`,pairName(k1,di,k2,dj),a,[[k1,di],[k2,dj]]));
+  }
+  TYPES.push(makeTypeInfo(++n,"balanced","「バランス型」の平均的ニンゲン",{c:50,p:50,r:50,s:50,d:50,q:50},[]));
+  return TYPES;
+}
+function makeTypeInfo(no,key,name,a,traits){
+  const sc=sectorScores(a), life=lifespan(sc);
+  const crit=SECTORS.filter(s=>s.crit).sort((x,y)=>sc[x.k]-sc[y.k])[0];
+  const best=SECTORS.slice().sort((x,y)=>sc[y.k]-sc[x.k])[0];
+  const tk=traits.map(t=>t.join("-"));
+  let evs;
+  if(traits.length){
+    const combo=QUIRKS.filter(q=>q.when.length>1&&q.when.every(w=>tk.includes(w.join("-"))));
+    // 組み合わせイベント → 各性格のイベントを交互に
+    const s1=QUIRKS.filter(q=>q.when.length===1&&q.when[0].join("-")===tk[0]);
+    const s2=QUIRKS.filter(q=>q.when.length===1&&q.when[0].join("-")===tk[1]);
+    const mixed=[]; for(let i=0;i<3;i++){ if(s1[i]) mixed.push(s1[i]); if(s2[i]) mixed.push(s2[i]); }
+    evs=combo.concat(mixed).slice(0,3).map(q=>q.tx);
+  } else evs=BALANCED.map(b=>b.tx).slice(0,2);
+  const comp=complements(a,sc)[0];
+  return {no,key,name,life,traits:tk,crit:life===Infinity?null:crit.name,best:best.name,bestV:sc[best.k],evs,comp:comp?comp.name:null};
+}
+let zFilter="all";
+function openZukan(focusKey){
+  buildTypes();
+  const chips=[["all","すべて"]];
+  AXIS_ORDER.forEach(k=>{ chips.push([k+"-hi",AXES[k].hi]); chips.push([k+"-lo",AXES[k].lo]); });
+  chips.push(["got","集めた"]);
+  $("zFilter").innerHTML=chips.map(([v,l])=>`<button class="fchip ${zFilter===v?"on":""}" data-v="${v}">${l}</button>`).join("");
+  $("zFilter").querySelectorAll(".fchip").forEach(b=>b.onclick=()=>{ zFilter=b.dataset.v; openZukan(); });
+  renderZukan(focusKey);
+  if($("zukan").classList.contains("hidden")){
+    zPrev=["start","result"].find(id=>!$(id).classList.contains("hidden"))||"start";
+    show("zukan");
+  }
+  if(focusKey){ const el=document.querySelector(`[data-key="${focusKey}"]`); if(el) setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"center"}),80); }
+}
+let zPrev="start";
+function renderZukan(openKey){
+  const me=store.get("me",null), got=store.get("got",[]);
+  $("zCount").textContent=`${got.length} / ${TYPES.length}`;
+  const list=TYPES.filter(t=> zFilter==="all" ? true : zFilter==="got" ? got.includes(t.key) : t.traits.includes(zFilter));
+  const lifeColor=l=>l===Infinity?"var(--good)":l<50?"var(--bad)":l<300?"var(--mid)":"var(--accent)";
+  $("zList").innerHTML=list.length?list.map(t=>{
+    const isMe=t.key===me, isGot=got.includes(t.key);
+    return `<div class="tcard ${isMe?"mine":""}" data-key="${t.key}">
+      <div class="thead"><span class="tno">No.${t.no}</span>
+        <span class="tname">${t.name}${isMe?'<span class="mark me">あなた</span>':isGot?'<span class="mark got">発見済み</span>':""}</span>
+        <span class="tlife" style="color:${lifeColor(t.life)}">${fmtLife(t.life)}</span></div>
+      <div class="tbody ${t.key===openKey?"":"hidden"}">
+        <div class="k">社会の終わり方</div><div>${t.crit?`「${t.crit}」で崩壊`:"崩壊しない(しぶとく続く)"}</div>
+        <div class="k">一番の強み</div><div>${t.best}</div>
+        <div class="k">こんなことが起きる</div><div>${t.evs.map(e=>"・"+e).join("<br>")}</div>
+        ${t.comp?`<div class="k">足りないのは…</div><div>${t.comp}</div>`:""}
+        ${isMe?"":`<button class="gotbtn ${isGot?"on":""}" data-got="${t.key}">${isGot?"✓ 見つけた":"友達がこのタイプだった！ → 見つけた！"}</button>`}
+      </div></div>`;
+  }).join(""):`<p class="sub" style="text-align:center">まだありません</p>`;
+  $("zList").querySelectorAll(".thead").forEach(h=>h.onclick=()=>h.nextElementSibling.classList.toggle("hidden"));
+  $("zList").querySelectorAll(".gotbtn").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const k=b.dataset.got; let g=store.get("got",[]);
+    g=g.includes(k)?g.filter(x=>x!==k):g.concat([k]); store.set("got",g);
+    renderZukan(k);
+  });
+}
+
 let idx=0, answers=[];
 const $=id=>document.getElementById(id);
 
+$("zukanBtn1").onclick=()=>openZukan(store.get("me",null));
+$("zBack").onclick=()=>show(zPrev);
 $("startBtn").onclick=()=>{ idx=0; answers=[]; show("quiz"); renderQ(); };
 
-function show(id){ ["start","quiz","result"].forEach(s=>$(s).classList.toggle("hidden",s!==id)); window.scrollTo(0,0); }
+function show(id){ ["start","quiz","result","zukan"].forEach(s=>$(s).classList.toggle("hidden",s!==id)); window.scrollTo(0,0); }
 
 function renderQ(){
   const Q=QUESTIONS[idx];
@@ -597,6 +721,8 @@ function finish(){
     <div style="height:10px"></div>
     <button class="btn ghost" id="copyBtn">結果をテキストでコピー</button>
     <div style="height:10px"></div>
+    <button class="btn ghost" id="zukanBtn2">📖 タイプ図鑑で自分を探す</button>
+    <div style="height:10px"></div>
     <button class="btn ghost" id="retryBtn">もう一度やる</button>
   </div>`;
   $("result").innerHTML=html;
@@ -610,6 +736,10 @@ function finish(){
     catch(e){ toast("コピーできませんでした"); }
   };
   $("retryBtn").onclick=()=>show("start");
+  const myKey=typeKey(a);
+  store.set("me",myKey);
+  const got=store.get("got",[]); if(!got.includes(myKey)){ got.push(myKey); store.set("got",got); }
+  $("zukanBtn2").onclick=()=>openZukan(myKey);
 
   // シェア用画像
   let causeLine="";
@@ -746,6 +876,7 @@ async function makeCard({tn,life,tl,causeLine,comp}){
 }
 
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
+if(location.hash==="#zukan") openZukan(store.get("me",null));
 </script>
 </body>
 </html>
