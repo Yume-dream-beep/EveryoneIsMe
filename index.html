@@ -345,7 +345,7 @@ function buildTimeline(a,sc,life){
       ev.push({y:1+Math.round((100-v)/5),g:"good",tx:s.hi,name:s.name});
     }
   });
-  QUIRKS.forEach(q=>{ if(q.t(a)) ev.push({y:q.y,g:q.g,tx:q.tx}); });
+  QUIRKS.forEach(q=>{ if(q.t(a)) ev.push({y:q.y,g:q.g,tx:q.tx,quirk:true}); });
   let list=ev.filter(e=>life===Infinity||e.y<life).sort((x,y)=>x.y-y.y);
   if(!list.some(e=>e.g==="bad")){
     const w=SECTORS.filter(x=>x.lo).sort((x,y)=>sc[x.k]-sc[y.k])[0];
@@ -364,9 +364,9 @@ function buildTimeline(a,sc,life){
     // 同じ分野の「低い」イベントは崩壊ストーリーと重なるので外す
     list=list.filter(e=>e.name!==worst.name);
     const yr=f=>Math.max(1,Math.round(life*f));
-    const story=[{y:yr(.3),g:"bad",tx:C.s1}];
-    if(causes[0]) story.push({y:yr(.55),g:"bad",tx:causes[0].lines[0]});
-    if(causes[1]) story.push({y:yr(.75),g:"bad",tx:causes[1].lines[0]});
+    const story=[{y:yr(.3),g:"bad",tx:C.s1,story:true}];
+    if(causes[0]) story.push({y:yr(.55),g:"bad",tx:causes[0].lines[0],story:true});
+    if(causes[1]) story.push({y:yr(.75),g:"bad",tx:causes[1].lines[0],story:true});
     if(causes[0]) story.push({y:yr(.9),g:"bad",tx:causes[0].lines[1]});
     // 年が重ならないよう少しずらす
     let last=0; story.forEach(e=>{ if(e.y<=last) e.y=last+1; last=e.y; });
@@ -473,7 +473,14 @@ function finish(){
       <p style="margin:0">あなたの「苦手」は、誰かの「得意」。<br>社会はいろんな人がいるから回っている。</p>
     </div>
 
-    <button class="btn" id="copyBtn">結果をコピーしてシェア</button>
+    <h2>📸 シェア用画像</h2>
+    <div class="card" style="text-align:center">
+      <div id="cardWrap"><p class="sub">画像をつくっています…</p></div>
+      <p class="sub" id="saveHint" style="margin-bottom:0">スマホは画像を長押しで保存できます</p>
+    </div>
+    <button class="btn" id="shareImgBtn">画像をシェア・保存</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" id="copyBtn">結果をテキストでコピー</button>
     <div style="height:10px"></div>
     <button class="btn ghost" id="retryBtn">もう一度やる</button>
   </div>`;
@@ -488,6 +495,139 @@ function finish(){
     catch(e){ toast("コピーできませんでした"); }
   };
   $("retryBtn").onclick=()=>show("start");
+
+  // シェア用画像
+  let causeLine="";
+  if(life!==Infinity){
+    const worst=SECTORS.filter(x=>x.crit).sort((x,y)=>sc[x.k]-sc[y.k])[0];
+    const c=collapseCauses(worst.k,a)[0];
+    if(c) causeLine=`崩壊の原因：${AXES[c.ax].name}が${c.dir==="hi"?"高すぎた":"低すぎた"}`;
+  }
+  makeCard({tn,life,tl,causeLine,comp:comps[0]}).then(cv=>{
+    const url=cv.toDataURL("image/png");
+    $("cardWrap").innerHTML=`<img src="${url}" alt="シミュレーション結果の画像" style="width:100%;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)">`;
+    $("shareImgBtn").onclick=async()=>{
+      try{
+        const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
+        const file=new File([blob],"everyone-is-me.png",{type:"image/png"});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){
+          await navigator.share({files:[file],text:shareText});
+          return;
+        }
+        const aEl=document.createElement("a"); aEl.href=url; aEl.download="everyone-is-me.png";
+        document.body.appendChild(aEl); aEl.click(); aEl.remove();
+        toast("画像を保存しました");
+      }catch(e){
+        if(e&&e.name==="AbortError") return;
+        toast("画像を長押しして保存してください");
+      }
+    };
+  }).catch(()=>{ $("cardWrap").innerHTML='<p class="sub">画像をつくれませんでした</p>'; });
+}
+
+// 年表から「笑いどころ」を選ぶ
+function pickEvents(tl){
+  const end=tl[tl.length-1];
+  const body=tl.slice(0,-1);
+  const chosen=[];
+  const add=arr=>arr.forEach(e=>{ if(chosen.length<5&&!chosen.includes(e)) chosen.push(e); });
+  add(body.filter(e=>e.quirk).slice(0,3));
+  add(body.filter(e=>e.story));
+  add(body.filter(e=>e.g==="bad"));
+  add(body.filter(e=>e.g==="good").slice(0,1));
+  add(body);
+  chosen.sort((x,y)=>(+x.y)-(+y.y));
+  return chosen.concat([end]);
+}
+
+function wrapText(ctx,text,maxW){
+  const lines=[]; let line="";
+  for(const ch of text){
+    const t=line+ch;
+    if(ctx.measureText(t).width>maxW&&line){
+      // 句読点・閉じかっこは行頭に来ないよう前の行へ
+      if("、。」』）！？…".includes(ch)){ lines.push(t); line=""; continue; }
+      lines.push(line); line=ch;
+    } else line=t;
+  }
+  if(line) lines.push(line);
+  return lines;
+}
+
+function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+async function makeCard({tn,life,tl,causeLine,comp}){
+  const F='"Zen Maru Gothic", sans-serif';
+  try{ await Promise.all(["400","700","900"].map(w=>document.fonts.load(`${w} 40px "Zen Maru Gothic"`,"あ年"))); }catch(e){}
+  const W=1080, H=1350, cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+  const ctx=cv.getContext("2d");
+  const C={bg:"#fbf6ee",ink:"#2b2622",sub:"#7a6f66",line:"#eadfd2",acc:"#e2683c",good:"#2f9e6b",bad:"#d6453d",mid:"#e0a526",blue:"#3c8ce2"};
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  // 背景の水玉
+  ctx.fillStyle="#f3e9db";
+  for(let i=0;i<14;i++){ ctx.beginPath(); ctx.arc((i*157)%W, (i*263)%H, 30+(i%4)*14, 0, Math.PI*2); ctx.fill(); }
+
+  ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+  ctx.fillStyle=C.acc; ctx.font=`700 30px ${F}`;
+  ctx.fillText("もし全人類が「わたし」だったら？",W/2,92);
+  ctx.fillStyle=C.ink; ctx.font=`900 48px ${F}`;
+  let y=160;
+  wrapText(ctx,tn,W-140).forEach(l=>{ ctx.fillText(l,W/2,y); y+=60; });
+
+  // 寿命
+  y+=6;
+  ctx.fillStyle=C.sub; ctx.font=`700 28px ${F}`;
+  ctx.fillText("社会が続いた期間",W/2,y); y+=104;
+  ctx.fillStyle=life===Infinity?C.good:C.acc; ctx.font=`900 96px ${F}`;
+  ctx.fillText(fmtLife(life),W/2,y); y+=20;
+  if(causeLine){ y+=40; ctx.fillStyle=C.bad; ctx.font=`700 30px ${F}`; ctx.fillText(causeLine,W/2,y); }
+
+  // 年表カード
+  y+=36;
+  const cx=60, cw=W-120, cardTop=y;
+  const footerH=comp?170:110;
+  const cardH=H-cardTop-footerH;
+  ctx.fillStyle="#fff"; rr(ctx,cx,cardTop,cw,cardH,32); ctx.fill();
+  ctx.strokeStyle=C.line; ctx.lineWidth=3; ctx.stroke();
+
+  ctx.textAlign="left";
+  ctx.fillStyle=C.ink; ctx.font=`900 34px ${F}`;
+  ctx.fillText("📜 わたしだらけの社会・年表",cx+40,cardTop+62);
+
+  const evs=pickEvents(tl);
+  const lineX=cx+62, textX=cx+100, textW=cw-170;
+  let ey=cardTop+118;
+  const bottom=cardTop+cardH-30;
+  // 入りきるまでフォントを小さくする
+  let fs=31;
+  const measure=size=>{ ctx.font=`500 ${size}px ${F}`; let h=0; evs.forEach(e=>{ h+=32+wrapText(ctx,e.tx,textW).length*(size*1.4)+18; }); return h; };
+  while(fs>22&&measure(fs)>bottom-ey) fs--;
+  // 縦線
+  ctx.strokeStyle=C.line; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(lineX,ey); ctx.lineTo(lineX,Math.min(bottom,ey+measure(fs)-40)); ctx.stroke();
+  for(const e of evs){
+    if(ey>bottom-40) break;
+    const col=e.g==="good"?C.good:e.g==="bad"?C.bad:e.g==="end"?C.ink:C.mid;
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(lineX,ey-8,13,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
+    ctx.fillStyle=C.sub; ctx.font=`700 24px ${F}`;
+    ctx.fillText(`${e.y}年目`,textX,ey);
+    ey+=36;
+    ctx.fillStyle=C.ink; ctx.font=`${e.g==="end"?700:500} ${fs}px ${F}`;
+    for(const l of wrapText(ctx,e.tx,textW)){ ctx.fillText(l,textX,ey); ey+=fs*1.4; }
+    ey+=18;
+  }
+
+  // フッター
+  ctx.textAlign="center";
+  let fy=cardTop+cardH+54;
+  if(comp){
+    ctx.fillStyle=C.blue; ctx.font=`700 28px ${F}`;
+    ctx.fillText(`足りなかったのは… ${comp.name}`,W/2,fy); fy+=58;
+  }
+  ctx.fillStyle=C.sub; ctx.font=`500 24px ${F}`;
+  ctx.fillText("全人類わたし化シミュレーター  yume-dream-beep.github.io/EveryoneIsMe",W/2,fy);
+  return cv;
 }
 
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
